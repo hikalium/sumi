@@ -1904,6 +1904,18 @@ pub static RULES: &[Rule] = &[
         ],
     },
     Rule {
+        avoid: &["Rust の版"],
+        write: &["Rustのバージョン"],
+        keep: &[],
+        note: Some("Rustのバージョンを指すときは「Rustのバージョン」と書く。"),
+        bad: &["Rust の版を確認する。", "OS と Rust の版を添える。"],
+        good: &[
+            "Rustのバージョンを確認する。",
+            "「Rust の版」は避ける書き方である。",
+            "`Rust の版` は例である。",
+        ],
+    },
+    Rule {
         avoid: &["前の版"],
         write: &["以前のバージョン"],
         keep: &[],
