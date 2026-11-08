@@ -1,0 +1,11 @@
+[package]
+name = "sumi"
+version = "0.1.0"
+edition = "2024"
+description = "Detect LLM-ish phrasing in Japanese prose. Reads stdin or a file and writes findings to stdout."
+license = "MIT"
+repository = "https://github.com/hikalium/sumi"
+readme = "README.md"
+publish = false
+
+[dependencies]

@@ -1,0 +1,10 @@
+/target
+
+# Local credentials and editor files
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+.DS_Store
+*.swp
