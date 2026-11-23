@@ -201,7 +201,7 @@ impl Hit<'_> {
     }
 }
 
-/// 1 つの規則を 1 行に当てる。avoid の複数の文字列が重なって当たるときは長い方を 1 件にまとめ、
+/// 1 つの規則を 1 行に適用する。avoid の複数の文字列が重なって当たるときは長い方を 1 件にまとめ、
 /// keep の語の出現に収まるヒットを除く。返す位置は start の順。
 fn rule_hits_in_line(doc: &Document, line: usize, rule: &Rule) -> Vec<(usize, usize)> {
     let chars = &doc.lines[line];
@@ -235,13 +235,13 @@ fn rule_hits_in_line(doc: &Document, line: usize, rule: &Rule) -> Vec<(usize, us
     accepted
 }
 
-/// 文書に規則を当て、ヒットを行、列、規則の順で返す。
+/// 文書に規則を適用し、ヒットを行、列、規則の順で返す。
 #[cfg(test)]
 pub fn scan<'a>(body: &str, rules: &'a [Rule]) -> Vec<Hit<'a>> {
     scan_doc(&Document::parse(body), rules)
 }
 
-/// 解析した文書に規則を当て、ヒットを行、列、規則の順で返す。
+/// 解析した文書に規則を適用し、ヒットを行、列、規則の順で返す。
 pub fn scan_doc<'a>(doc: &Document, rules: &'a [Rule]) -> Vec<Hit<'a>> {
     let mut hits: Vec<(usize, usize, usize, Hit<'a>)> = Vec::new();
     for line in 0..doc.lines.len() {
