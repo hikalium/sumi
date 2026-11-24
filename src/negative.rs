@@ -56,8 +56,11 @@ const WORK: &[&str] = &[
     "ベンチマーク",
     "ベンチ",
     "レビュー",
+    "テストケース",
     "テスト",
     "洗い出し",
+    "特定",
+    "証明",
     "最適化",
     "実施",
     "実装",
@@ -141,6 +144,8 @@ const TE: &[&str] = &[
     "走らせて",
     "流して",
     "書いて",
+    "やって",
+    "至って",
     "確かめて",
 ];
 
@@ -163,12 +168,30 @@ const PAST_NEG: &[&str] = &[
     "しなかった",
     "行いませんでした",
     "行わなかった",
+    "やりませんでした",
+    "やらなかった",
     "試さなかった",
     "回さなかった",
     "確かめなかった",
     "に至っていません",
     "に至っていない",
 ];
+
+/// 打ち消しの連用中止形 (「計測は行わず、既定値を使った」)。「計画を実行せず、」のような指示と分けるため、
+/// 対比の助詞「は」「も」の後ろだけで拾う。
+const ZU: &[&str] = &[
+    "行わず、",
+    "試さず、",
+    "調べず、",
+    "測らず、",
+    "確かめず、",
+    "せず、",
+];
+
+fn zu() -> &'static [String] {
+    static LIST: OnceLock<Vec<String>> = OnceLock::new();
+    LIST.get_or_init(|| ZU.iter().map(|z| z.to_string()).collect())
+}
 
 /// 作業を飛ばしたことの報告 (型 E)。指示と分けるため、過去形と「ている」の形だけを置く。
 const SKIPPED: &[&str] = &[
@@ -184,6 +207,10 @@ const SKIPPED: &[&str] = &[
     "見送っている",
     "割愛した",
     "割愛している",
+    "見送り、",
+    "後回しにし、",
+    "スキップし、",
+    "割愛し、",
 ];
 
 /// 「て」の形と否定を組んだ述語の一覧。長いものを先に照合する。
@@ -228,7 +255,15 @@ fn verb_undone() -> &'static [String] {
 }
 
 const GROUND: &[&str] = &["根拠", "証拠", "裏付け", "確証"];
-const ABSENT: &[&str] = &["ありません", "なかった", "ない", "無い"];
+const ABSENT: &[&str] = &[
+    "得られていません",
+    "得られていない",
+    "得られなかった",
+    "ありません",
+    "なかった",
+    "ない",
+    "無い",
+];
 
 const NOT_COPULA: &[&str] = &["ではありません", "ではない", "じゃない"];
 /// 「わけではない」。直前が過去の「た」「だ」のとき (「全てを調べたわけではない」) だけ拾い、
@@ -335,7 +370,7 @@ fn predicate_at(s: &[char], at: usize, list: &[String]) -> Option<usize> {
         }
         let from = at + len(adv);
         for u in list {
-            if starts_with(s, from, u) && predicate_end(s, from + len(u)) {
+            if starts_with(s, from, u) && (u.ends_with('、') || predicate_end(s, from + len(u))) {
                 return Some(from + len(u));
             }
         }
@@ -343,12 +378,30 @@ fn predicate_at(s: &[char], at: usize, list: &[String]) -> Option<usize> {
     None
 }
 
+/// 文末が過去か「ている」の形 (した、している、しました) か。打ち消しの連用中止形 (「〜は行わず、」) は時制を
+/// 持たないので、文末の形で、設計や手順の文 (「再試行はせず、stalled にする」) と作業の報告を分ける。
+fn ends_as_report(s: &[char]) -> bool {
+    let end = s
+        .iter()
+        .rposition(|c| !matches!(c, ')' | '」' | '\u{0}' | '*' | '_'))
+        .map_or(0, |k| k + 1);
+    let body = &s[..end];
+    ["た", "ている", "ていた", "ています", "ました", "でした"]
+        .iter()
+        .any(|w| body.len() >= len(w) && starts_with(body, body.len() - len(w), w))
+}
 /// 型 A、D、E: 作業の名詞か読む目的語から始まる、未完了、範囲外、省略の報告。
 fn work_at(s: &[char], i: usize) -> Option<usize> {
     // 目的語を問わない作業の動詞 (「影響の有無は調べていない」)
     if i > 0
         && ['を', 'は', 'も'].contains(&s[i - 1])
         && let Some(end) = predicate_at(s, i, verb_undone())
+    {
+        return Some(end);
+    }
+    if i > 0
+        && ['は', 'も'].contains(&s[i - 1])
+        && let Some(end) = predicate_at(s, i, zu()).filter(|_| ends_as_report(s))
     {
         return Some(end);
     }
@@ -378,8 +431,9 @@ fn work_at(s: &[char], i: usize) -> Option<usize> {
             if let Some(end) = predicate_at(s, at, undone()) {
                 return Some(end);
             }
-            if !p.is_empty()
+            if ["は", "も"].contains(p)
                 && let Some(end) = predicate_at(s, at, passive())
+                    .or_else(|| predicate_at(s, at, zu()).filter(|_| ends_as_report(s)))
             {
                 return Some(end);
             }
@@ -408,6 +462,7 @@ fn work_at(s: &[char], i: usize) -> Option<usize> {
                     if let Some(o) = OUT_OF_SCOPE.iter().find(|o| starts_with(s, o_at, o))
                         && !starts_with(s, o_at + len(o), "の")
                         && !starts_with(s, o_at + len(o), "なら")
+                        && !s.get(o_at + len(o)).is_some_and(|c| is_noun_start(*c))
                     {
                         return Some(o_at + len(o));
                     }
@@ -429,7 +484,7 @@ fn ground_at(s: &[char], i: usize) -> Option<usize> {
             if !starts_with(s, after, p) {
                 continue;
             }
-            for adv in ["特に", "全く", "一切", ""] {
+            for adv in ["特に", "全く", "一切", "まだ", ""] {
                 let from = after + 1 + len(adv);
                 if !starts_with(s, after + 1, adv) {
                     continue;
@@ -445,12 +500,24 @@ fn ground_at(s: &[char], i: usize) -> Option<usize> {
     None
 }
 
+/// 「わけではない」の前が、作業の報告でなく理由の否定や状態の変化の説明か。「下げたからといって、減ったわけではない」
+/// 「非推奨になっただけで、削除されたわけではない」のような文を除く。
+fn wake_states_a_change(s: &[char], i: usize) -> bool {
+    let before = &s[..i];
+    let has = |w: &str| (0..before.len()).any(|k| starts_with(before, k, w));
+    has("からといって")
+        || has("だけで")
+        || ["れた", "になった"]
+            .iter()
+            .any(|w| i >= len(w) && starts_with(s, i - len(w), w))
+}
 /// 型 C: 範囲の打ち消し。
 fn scope_at(s: &[char], i: usize) -> Option<usize> {
     for w in WAKE {
         if starts_with(s, i, w)
             && i > 0
             && ['た', 'だ'].contains(&s[i - 1])
+            && !wake_states_a_change(s, i)
             && predicate_end(s, i + len(w))
         {
             return Some(i + len(w));
