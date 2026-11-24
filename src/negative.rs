@@ -383,7 +383,7 @@ fn predicate_at(s: &[char], at: usize, list: &[String]) -> Option<usize> {
 fn ends_as_report(s: &[char]) -> bool {
     let end = s
         .iter()
-        .rposition(|c| !matches!(c, ')' | '」' | '\u{0}' | '*' | '_'))
+        .rposition(|c| !matches!(c, ')' | '\u{ff09}' | '」' | '\u{0}' | '*' | '_'))
         .map_or(0, |k| k + 1);
     let body = &s[..end];
     ["た", "ている", "ていた", "ています", "ました", "でした"]
