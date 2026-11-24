@@ -82,6 +82,9 @@ const WORK: &[&str] = &[
     "反映",
     "検討",
     "分析",
+    "変更",
+    "操作",
+    "転記",
 ];
 
 /// 読む作業の目的語。「ログを読んでいない」のように、読む動詞とだけ組んで作業を表す。
@@ -89,7 +92,7 @@ const READ_OBJECT: &[&str] = &["ログ", "コード", "差分", "ソース"];
 const READ_VERB: &[&str] = &["読んで", "見て"];
 
 /// 目的語を問わず、それだけで書き手の作業を表す動詞の「て」の形。直前の助詞 (を、は、も) と組む。
-const WORK_VERB: &[&str] = &["調べて", "測って", "確かめて", "試して"];
+const WORK_VERB: &[&str] = &["調べて", "測って", "確かめて", "試して", "触って"];
 
 /// 作業の名詞の後ろに置ける助詞。空の文字列は、名詞の直後に述語が続く形。長いものを先に置く。
 const PARTICLES: &[&str] = &[
@@ -313,6 +316,8 @@ const ASSURANCE: &[&str] = &[
     "評価",
     "修正",
     "解決",
+    "合格",
+    "適用",
     "仕様",
 ];
 
@@ -335,6 +340,7 @@ const NOT_PREDICATE: &[&str] = &[
     "ほう",
     "ところ",
     "やり方",
+    "か",
     "り",
 ];
 
@@ -453,7 +459,8 @@ fn work_at(s: &[char], i: usize) -> Option<usize> {
                 }
             }
             // D: 助詞の直後、または文書や作業を指す語の直後の「範囲外」。「実行」は仕組みの動作も指すので除く
-            if *w != "実行" && ["は", "も", "を", "については"].contains(p) {
+            if !["実行", "変更"].contains(w) && ["は", "も", "を", "については"].contains(p)
+            {
                 for owner in SCOPE_OWNER {
                     if !starts_with(s, at, owner) {
                         continue;
@@ -511,6 +518,22 @@ fn wake_states_a_change(s: &[char], i: usize) -> bool {
             .iter()
             .any(|w| i >= len(w) && starts_with(s, i - len(w), w))
 }
+
+/// 型 C の一部: 保証と証明の打ち消し。前半の「であり」が無くても、文書では範囲の打ち消しである
+/// (「実モデルが従う保証ではない」)。プログラムのコメントでは「権限の保証ではない」のような説明に使うので外す。
+fn assurance_at(s: &[char], i: usize) -> Option<usize> {
+    for a in ["保証", "証明"] {
+        for n in NOT_COPULA {
+            if starts_with(s, i, a)
+                && starts_with(s, i + len(a), n)
+                && predicate_end(s, i + len(a) + len(n))
+            {
+                return Some(i + len(a) + len(n));
+            }
+        }
+    }
+    None
+}
 /// 型 C: 範囲の打ち消し。
 fn scope_at(s: &[char], i: usize) -> Option<usize> {
     for w in WAKE {
@@ -558,7 +581,7 @@ fn scope_at(s: &[char], i: usize) -> Option<usize> {
 fn find(s: &[char], prose: Prose) -> Option<(usize, usize)> {
     for i in 0..s.len() {
         if prose == Prose::Document
-            && let Some(end) = work_at(s, i)
+            && let Some(end) = work_at(s, i).or_else(|| assurance_at(s, i))
         {
             return Some((i, end));
         }

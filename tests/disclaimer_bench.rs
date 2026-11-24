@@ -13,17 +13,27 @@ const MARKERS: &[&str] = &[
 ];
 
 struct Example {
+    /// 実世界の文書からの完全な一文 (`S:`) か、生成した文 (`G:`) か
+    sampled: bool,
     rust: bool,
     text: String,
 }
 
+/// `S: md: 文` の形の 1 行を読む。行頭の `S:` は実世界の文、`G:` は生成した文、次の `md:` と `rs:` は
+/// Markdown と Rust のコメントである。
 fn parse(line: &str) -> Option<Example> {
-    let (rust, text) = if let Some(t) = line.strip_prefix("md: ") {
+    let (sampled, rest) = if let Some(r) = line.strip_prefix("S: ") {
+        (true, r)
+    } else {
+        (false, line.strip_prefix("G: ")?)
+    };
+    let (rust, text) = if let Some(t) = rest.strip_prefix("md: ") {
         (false, t)
     } else {
-        (true, line.strip_prefix("rs: ")?)
+        (true, rest.strip_prefix("rs: ")?)
     };
     Some(Example {
+        sampled,
         rust,
         text: text.replace("\\n", "\n"),
     })
@@ -67,27 +77,57 @@ fn disclaimer_hits(e: &Example) -> Vec<String> {
         .collect()
 }
 
+/// 例文の判定が期待どおりだった数を、実世界の文 (S) と生成した文 (G) に分けて数える。
+#[derive(Default)]
+struct Tally {
+    sampled: (usize, usize),
+    generated: (usize, usize),
+}
+
+impl Tally {
+    fn add(&mut self, e: &Example, ok: bool) {
+        let t = if e.sampled {
+            &mut self.sampled
+        } else {
+            &mut self.generated
+        };
+        t.0 += usize::from(ok);
+        t.1 += 1;
+    }
+
+    fn render(&self) -> String {
+        format!(
+            "{}/{} (S {}/{}、G {}/{})",
+            self.sampled.0 + self.generated.0,
+            self.sampled.1 + self.generated.1,
+            self.sampled.0,
+            self.sampled.1,
+            self.generated.0,
+            self.generated.1
+        )
+    }
+}
+
 #[test]
 fn disclaimer_benchmark() {
     let rejected = examples(include_str!("disclaimer/rejected.txt"));
     let allowed = examples(include_str!("disclaimer/allowed.txt"));
     let mut wrong = Vec::new();
-    let mut caught = 0;
+    let mut caught = Tally::default();
     for (line, e) in &rejected {
-        if disclaimer_hits(e).is_empty() {
+        let ok = !disclaimer_hits(e).is_empty();
+        if !ok {
             wrong.push(format!("見逃し: {line}"));
-        } else {
-            caught += 1;
         }
+        caught.add(e, ok);
     }
-    let mut passed = 0;
+    let mut passed = Tally::default();
     for (line, e) in &allowed {
         let hits = disclaimer_hits(e);
-        if hits.is_empty() {
-            passed += 1;
-        } else {
+        if !hits.is_empty() {
             wrong.push(format!("誤検知: {line} -> {}", hits.join(" / ")));
         }
+        passed.add(e, hits.is_empty());
     }
     for line in include_str!("disclaimer/limits.txt").lines() {
         let (expect_hit, rest) = if let Some(r) = line.strip_prefix("hit ") {
@@ -102,11 +142,26 @@ fn disclaimer_benchmark() {
             wrong.push(format!("限界の例の判定が変わった: {line}"));
         }
     }
-    println!(
-        "検出 {caught}/{} 、通過 {passed}/{}",
-        rejected.len(),
-        allowed.len()
-    );
+    println!("検出 {} 、通過 {}", caught.render(), passed.render());
+    // 書式の誤りで例文を読み落とさないように、`S:` か `G:` で始まる行の数と読めた例文の数を比べる
+    for (name, data, read) in [
+        (
+            "rejected.txt",
+            include_str!("disclaimer/rejected.txt"),
+            rejected.len(),
+        ),
+        (
+            "allowed.txt",
+            include_str!("disclaimer/allowed.txt"),
+            allowed.len(),
+        ),
+    ] {
+        let lines = data
+            .lines()
+            .filter(|l| l.starts_with("S: ") || l.starts_with("G: "))
+            .count();
+        assert_eq!(lines, read, "{name} に読めない例文の行がある");
+    }
     assert!(
         wrong.is_empty(),
         "{} 件:\n  {}",
