@@ -57,7 +57,7 @@ fn every_anti_case_hits_its_signal_and_every_rewrite_is_clean() {
     assert!(
         rules
             .lines()
-            .find(|line| line.starts_with("〜や〜はしていない / "))
+            .find(|line| line.starts_with("作業の名詞 + していない / "))
             .unwrap()
             .contains(PURPOSE_CHECK)
     );

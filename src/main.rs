@@ -213,6 +213,11 @@ fn check(out: &mut impl Write, opts: CheckOptions) -> Result<i32, String> {
     };
     // 検査する本文と単位の割り方。Rust と HTML は、行末のコメントや要素のタグを見分けるために
     // 元のソースも読む
+    // 作業の報告の型を適用するか。Rust のコメントはプログラムが主語の説明が多いので外す
+    let prose = match lang {
+        Lang::Rust => negative::Prose::Comment,
+        Lang::Markdown | Lang::Html => negative::Prose::Document,
+    };
     let (body, layout) = match lang {
         Lang::Markdown => (src, mixed::Layout::plain()),
         Lang::Rust => {
@@ -245,7 +250,7 @@ fn check(out: &mut impl Write, opts: CheckOptions) -> Result<i32, String> {
                 .map(|h| (h.line, h.col, h.render())),
         )
         .chain(
-            negative::scan_units(&units)
+            negative::scan_units(&units, prose)
                 .iter()
                 .map(|h| (h.line, h.col, h.render())),
         )

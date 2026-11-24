@@ -102,7 +102,7 @@ fn rules_lists_one_line_per_rule() {
         "{}",
         lines[n - 3]
     );
-    assert!(lines[n - 2].starts_with("〜や〜はしていない / "));
+    assert!(lines[n - 2].starts_with("作業の名詞 + していない / "));
     assert!(lines[n - 1].starts_with("(前後に漢字もカタカナも無く、"));
 }
 
@@ -111,7 +111,7 @@ fn negative_constructions_reach_each_output_mode_and_language() {
     let body = "実装や実験はしていない。";
     let r = sumi(&["--check-only"], body.as_bytes());
     assert_eq!(r.code, 1);
-    assert!(r.stdout.starts_with("1:6: 「はしていない」-> "));
+    assert!(r.stdout.starts_with("1:4: 「実験はしていない」-> "));
     assert!(r.stdout.contains("事実・現在の状態"));
     let r = sumi(&[], body.as_bytes());
     assert_eq!(r.code, 1);
@@ -121,7 +121,7 @@ fn negative_constructions_reach_each_output_mode_and_language() {
     assert!(r.stdout.is_empty());
     let r = sumi(
         &["--lang", "rust", "--check-only"],
-        "// 実装はしていない。\nlet x = \"実装はしていない。\";".as_bytes(),
+        "// この上限には根拠がない。\nlet x = \"根拠がない。\";".as_bytes(),
     );
     assert_eq!(r.code, 1);
     assert_eq!(r.stdout.lines().count(), 1);
@@ -259,7 +259,13 @@ fn sumi_own_documents_and_comments_pass() {
     }
     let mut failures = String::new();
     let anti_cases = root.join("anti-cases");
-    for path in &files {
+    // tests/disclaimer/ は免責の検出のベンチマークの例文で、検出を期待する文を含む。
+    // tests/disclaimer_bench.rs が 1 文ずつ判定を検査する
+    let disclaimer = root.join("tests").join("disclaimer");
+    for path in files
+        .iter()
+        .filter(|p| p.parent() != Some(disclaimer.as_path()))
+    {
         let r = sumi(&["--check-only", "--file", path.to_str().unwrap()], b"");
         let expected = i32::from(
             path.parent() == Some(anti_cases.as_path())

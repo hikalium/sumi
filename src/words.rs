@@ -1353,7 +1353,7 @@ mod tests {
                 found.push(format!("{key}: {}", h.render()));
             }
             let units = prose_units(&Document::parse(text), &Layout::plain());
-            for h in crate::negative::scan_units(&units) {
+            for h in crate::negative::scan_units(&units, crate::negative::Prose::Document) {
                 found.push(format!("{key}: {}", h.render()));
             }
         }
