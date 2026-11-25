@@ -35,7 +35,7 @@ pub fn code_span_mask(chars: &[char]) -> Vec<bool> {
             i += open; // フェンス記号への言及として扱い、周りの散文を検査対象に残す
             continue;
         }
-        // 同じ長さの閉じの連なりを行末までに探す
+        // 同じ長さの、閉じる側の連なりを行末までに探す
         let mut j = i + open;
         let mut close = None;
         while j < n && chars[j] != '\n' {
